@@ -21,6 +21,15 @@ const categoryRoutes = require('./routes/categoryRoutes');
 // deve ser gerenciada pelo arquivo 'categoryRoutes'.
 app.use('/categories', categoryRoutes);
 
+const itemRoutes = require('./routes/itemRoutes'); 
+app.use('/items', itemRoutes);             
+
+const addressRoutes = require('./routes/addressRoutes'); 
+app.use('/addresses', addressRoutes);
+
+const userRoutes = require('./routes/userRoutes');
+app.use('/users', userRoutes);
+
 // ==========================================================
 
 /*
