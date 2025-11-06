@@ -7,4 +7,6 @@ BigInt.prototype.toJSON = function() {
 
 const prisma = new PrismaClient();
 
+console.log("--- 1. ARQUIVO prismaClient.js FOI EXECUTADO ---"); 
+
 module.exports = prisma;

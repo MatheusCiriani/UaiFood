@@ -30,6 +30,9 @@ app.use('/addresses', addressRoutes);
 const userRoutes = require('./routes/userRoutes');
 app.use('/users', userRoutes);
 
+const orderRoutes = require('./routes/orderRoutes');
+app.use('/orders', orderRoutes);
+
 // ==========================================================
 
 /*

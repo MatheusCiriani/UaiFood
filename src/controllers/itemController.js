@@ -1,6 +1,8 @@
 // src/controllers/itemController.js
 const prisma = require('../lib/prismaClient');
 
+console.log("--- 2. ITEM CONTROLLER: A variável prisma é:", typeof prisma); 
+
 class ItemController {
 
   // --- CREATE ---
