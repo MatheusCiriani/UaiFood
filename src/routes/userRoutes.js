@@ -2,6 +2,7 @@
 const { Router } = require('express');
 const userController = require('../controllers/userController');
 const checkAuth = require('../middlewares/checkAuth');
+const checkAdmin = require('../middlewares/checkAdmin')
 
 const router = Router();
 
@@ -11,11 +12,11 @@ router.post('/', userController.create);
 
 // --- READ (All) ---
 // GET /users
-router.get('/',checkAuth, userController.getAll);
+router.get('/',[checkAuth, checkAdmin], userController.getAll);
 
 // --- READ (by ID) ---
 // GET /users/:id
-router.get('/:id',checkAuth, userController.getById);
+router.get('/:id',[checkAuth, checkAdmin], userController.getById);
 
 // --- UPDATE ---
 // PUT /users/:id
