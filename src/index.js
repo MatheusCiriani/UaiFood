@@ -33,6 +33,9 @@ app.use('/users', userRoutes);
 const orderRoutes = require('./routes/orderRoutes');
 app.use('/orders', orderRoutes);
 
+const authRoutes = require('./routes/authRoutes');
+app.use('/auth', authRoutes);
+
 // ==========================================================
 
 /*

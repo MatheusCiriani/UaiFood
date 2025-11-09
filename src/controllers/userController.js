@@ -1,11 +1,12 @@
 // src/controllers/userController.js
-const prisma = require('../lib/prismaClient'); // Você está usando 'prismaClient', vou manter
+const prisma = require('../lib/prismaClient');
 const bcrypt = require('bcrypt');
 
 // Um "select" padrão para NUNCA retornar a senha
 const userSelect = {
   id: true,
   name: true,
+  email: true, // <-- MUDANÇA: Adicionado
   phone: true,
   type: true,
   addressId: true,
@@ -19,12 +20,12 @@ class UserController {
   // --- CREATE (MODIFICADO) ---
   async create(req, res) {
     try {
-      // Agora esperamos um objeto 'address' no body, e NÃO 'addressId'
-      const { name, phone, password, type, address } = req.body;
+      // Agora esperamos 'email'
+      const { name, email, phone, password, type, address } = req.body;
 
       // Validação dos dados do Usuário
-      if (!name || !phone || !password || !type) {
-        return res.status(400).json({ error: 'Nome, Telefone, Senha e Tipo são obrigatórios.' });
+      if (!name || !email || !phone || !password || !type) { // <-- MUDANÇA: 'email' adicionado à validação
+        return res.status(400).json({ error: 'Nome, Email, Telefone, Senha e Tipo são obrigatórios.' });
       }
 
       // Validação do 'address' (agora é obrigatório)
@@ -48,16 +49,14 @@ class UserController {
       const hashedPassword = await bcrypt.hash(password, salt);
       // -------------------------------
 
-      // --- CRIAÇÃO ANINHADA (NESTED CREATE) ---
-      // O Prisma vai criar o Usuário e o Endereço na mesma transação.
-      // Ele cria o 'address' primeiro, pega o ID, e o vincula ao novo 'user'.
       const newUser = await prisma.user.create({
         data: {
           name,
+          email, // <-- MUDANÇA: Adicionado
           phone,
           password: hashedPassword,
           type,
-          address: { // Aqui está a mágica
+          address: { //
             create: {
               street: address.street,
               number: address.number,
@@ -74,11 +73,9 @@ class UserController {
       res.status(201).json(newUser);
 
     } catch (error) {
-      // Os erros P2003 e P2002 (de 'addressId') não se aplicam mais aqui,
-      // pois estamos criando o endereço junto.
-      // Um erro P2002 (unique constraint) pode acontecer se 'phone' for único no schema, por exemplo.
       if (error.code === 'P2002') {
-         return res.status(409).json({ error: 'Erro de campo único (ex: telefone ou endereço já podem estar em uso, se forem @unique)', details: error.message });
+         // <-- MUDANÇA: Mensagem de erro atualizada
+         return res.status(409).json({ error: 'Erro de campo único. O Email, Telefone ou Endereço já está em uso.', details: error.message });
       }
       res.status(500).json({ error: 'Erro ao criar usuário e endereço', details: error.message });
     }
@@ -115,19 +112,18 @@ class UserController {
     }
   }
 
-  // --- UPDATE ---
-  // A lógica de update continua a mesma. 
-  // O usuário pode atualizar seus dados ou trocar seu 'addressId' por outro existente.
-  // Se quiséssemos permitir a ATUALIZAÇÃO do endereço aninhado, faríamos parecido com o create.
+  // --- UPDATE (MODIFICADO) ---
   async update(req, res) {
-    let addressId; // Para usar no catch
+    let addressId; //
     try {
       const userId = BigInt(req.params.id);
-      let { name, phone, password, type, addressId } = req.body;
+      // <-- MUDANÇA: 'email' adicionado
+      let { name, email, phone, password, type, addressId } = req.body;
 
       const dataToUpdate = {};
 
       if (name) dataToUpdate.name = name;
+      if (email) dataToUpdate.email = email; // <-- MUDANÇA: Adicionado
       if (phone) dataToUpdate.phone = phone;
       if (addressId) dataToUpdate.addressId = BigInt(addressId);
       
@@ -157,6 +153,10 @@ class UserController {
       if (error.code === 'P2003') {
         return res.status(404).json({ error: `Endereço com ID ${addressId} não encontrado.` });
       }
+      // <-- MUDANÇA: Adicionado P2002 para o update
+      if (error.code === 'P2002') {
+         return res.status(409).json({ error: 'Erro de campo único. O Email, Telefone ou Endereço já está em uso.', details: error.message });
+      }
       res.status(500).json({ error: 'Erro ao atualizar usuário', details: error.message });
     }
   }
@@ -165,12 +165,6 @@ class UserController {
   async delete(req, res) {
     try {
       const userId = BigInt(req.params.id);
-
-      // Importante: Como o Endereço está 1-para-1, 
-      // o que acontece com ele quando o User é deletado?
-      // Depende do 'onDelete' no seu schema. Se não houver,
-      // você pode precisar deletar o endereço manualmente
-      // ou o endereço ficará "órfão" no banco.
 
       await prisma.user.delete({
         where: { id: userId },

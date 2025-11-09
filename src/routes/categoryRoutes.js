@@ -1,6 +1,7 @@
 // src/routes/categoryRoutes.js
 const { Router } = require('express');
 const categoryController = require('../controllers/categoryController');
+const checkAuth = require('../middlewares/checkAuth');
 
 const router = Router();
 
@@ -8,7 +9,7 @@ const router = Router();
 // porque vamos registrar este router no caminho '/categories' no index.js
 
 // --- CREATE ---
-router.post('/', categoryController.create);
+router.post('/',checkAuth, categoryController.create);
 
 // --- READ (All) ---
 router.get('/', categoryController.getAll);
@@ -17,9 +18,9 @@ router.get('/', categoryController.getAll);
 router.get('/:id', categoryController.getById);
 
 // --- UPDATE ---
-router.put('/:id', categoryController.update);
+router.put('/:id',checkAuth, categoryController.update);
 
 // --- DELETE ---
-router.delete('/:id', categoryController.delete);
+router.delete('/:id',checkAuth, categoryController.delete);
 
 module.exports = router;
