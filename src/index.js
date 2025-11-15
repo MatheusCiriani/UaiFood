@@ -1,13 +1,13 @@
 // src/index.js
 const express = require('express');
+const cors = require('cors');
 
-// Não precisamos mais do PrismaClient ou do BigInt aqui
-// const { PrismaClient } = require('@prisma/client');
-// BigInt.prototype.toJSON = function() { ... }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+
+app.use(cors());
 // Middleware para o Express "ler" JSON
 app.use(express.json());
 
@@ -37,11 +37,6 @@ const authRoutes = require('./routes/authRoutes');
 app.use('/auth', authRoutes);
 
 // ==========================================================
-
-/*
- * Todo o CRUD DE CATEGORIAS foi removido daqui
- * e movido para 'controllers' e 'routes'
- */
 
 // --- Rota Padrão ---
 app.get('/', (req, res) => {

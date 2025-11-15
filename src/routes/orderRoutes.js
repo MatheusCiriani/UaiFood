@@ -12,7 +12,7 @@ router.post('/',checkAuth, orderController.create);
 
 // --- READ (All) ---
 // GET /orders
-router.get('/',[checkAuth, checkAdmin], orderController.getAll);
+router.get('/',checkAuth, orderController.getAll);
 
 // --- READ (by ID) ---
 // GET /orders/:id

@@ -87,10 +87,24 @@ class OrderController {
   // --- READ (All) ---
   async getAll(req, res) {
     try {
+      // 1. Pega o ID e o TIPO do usuário do token (injetado pelo checkAuth)
+      const { id: userId, type: userType } = req.user; 
+
+      // 2. Prepara o filtro do Prisma
+      const whereClause = {};
+
+      // 3. Se o usuário NÃO for ADMIN, filtra pelo ID dele
+      if (userType !== 'ADMIN') {
+        whereClause.clientId = BigInt(userId);
+      }
+      
+      // 4. O findMany agora usa o filtro
       const orders = await prisma.order.findMany({
+        where: whereClause, // <-- FILTRO APLICADO
         include: orderInclude,
-        orderBy: { createdAt: 'desc' } // Opcional: mais novos primeiro
+        orderBy: { createdAt: 'desc' }
       });
+      
       res.status(200).json(orders);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao buscar pedidos', details: error.message });
