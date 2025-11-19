@@ -6,20 +6,19 @@ const validate = (schema) => (req, res, next) => {
     next();
   } catch (error) {
     
-    // --- MUDANÇA AQUI ---
-    // Pegamos a primeira mensagem de erro específica do Zod
-    // Ex: "Formato de email inválido"
-    const message = error.errors[0].message;
+    // --- CORREÇÃO APLICADA ---
+    // Usamos '?.' (optional chaining). 
+    // Se 'error.errors' não existir, ele tenta pegar 'error.message'.
+    // Se nem isso existir, usa uma mensagem genérica.
+    const message = error.errors?.[0]?.message || error.message || "Erro na validação dos dados";
 
     return res.status(400).json({
-      // Agora enviamos a mensagem específica no campo 'error'
-      // Assim o seu frontend (toast/alert) vai mostrar o texto certo.
       error: message, 
       
-      // Mantemos os detalhes técnicos caso precise debugar depois
-      details: error.errors 
+      // Se for erro do Zod envia 'errors', senão envia o objeto de erro inteiro para debug
+      details: error.errors || error 
     });
-    // --- FIM DA MUDANÇA ---
+    // --- FIM DA CORREÇÃO ---
   }
 };
 
