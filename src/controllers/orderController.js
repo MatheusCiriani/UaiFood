@@ -1,24 +1,10 @@
 // src/controllers/orderController.js
 const prisma = require('../lib/prismaClient');
 
-console.log("--- 3. ORDER CONTROLLER: A variável prisma é:", typeof prisma); 
-// Um "include" padrão para trazer todos os detalhes do pedido
 const orderInclude = {
-  // Traz o cliente, mas seleciona só o ID e Nome
-  client: {
-    select: { id: true, name: true, phone: true }
-  },
-  // Traz o funcionário que criou, selecionando ID e Nome
-  createdBy: {
-    select: { id: true, name: true }
-  },
-  // Traz os itens do pedido
-  orderItems: {
-    include: {
-      // Traz os detalhes do Item (produto) de cada orderItem
-      item: true
-    }
-  }
+  client: { select: { id: true, name: true, phone: true } },
+  createdBy: { select: { id: true, name: true } },
+  orderItems: { include: { item: true } }
 }
 
 class OrderController {
@@ -26,31 +12,8 @@ class OrderController {
   // --- CREATE ---
   async create(req, res) {
     try {
+      // Zod validou 'paymentMethod' e 'items'
       const { paymentMethod, status, clientId, createdById, items } = req.body;
-
-      // --- Validação ---
-      if (!paymentMethod || !status || !clientId || !createdById) {
-        return res.status(400).json({ error: 'Método de Pagamento, Status, ID do Cliente e ID do Criador são obrigatórios.' });
-      }
-
-      // Valida o ENUM PaymentMethod
-      const validMethods = ['CASH', 'DEBIT', 'CREDIT', 'PIX'];
-      if (!validMethods.includes(paymentMethod)) {
-        return res.status(400).json({ error: `Método de Pagamento deve ser um de: ${validMethods.join(', ')}` });
-      }
-
-      // Valida o array de Itens
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: 'O pedido deve conter pelo menos um item.' });
-      }
-
-      // Validação interna dos itens
-      for (const item of items) {
-        if (!item.itemId || !item.quantity) {
-          return res.status(400).json({ error: 'Cada item deve ter "itemId" e "quantity".' });
-        }
-      }
-      // --- Fim Validação ---
 
       const newOrder = await prisma.order.create({
         data: {
@@ -58,102 +21,61 @@ class OrderController {
           status,
           clientId: BigInt(clientId),
           createdById: BigInt(createdById),
-          orderItems: { // --- CRIAÇÃO ANINHADA (Nested Write) ---
+          orderItems: {
             create: items.map(item => ({
-              quantity: parseInt(item.quantity),
-              item: { // Conecta o item existente
-                connect: { id: BigInt(item.itemId) }
+              quantity: item.quantity, // Zod já converteu para number
+              item: { 
+                connect: { id: BigInt(item.itemId) } 
               }
             }))
           }
         },
-        include: orderInclude // Inclui todos os detalhes no retorno
+        include: orderInclude
       });
       res.status(201).json(newOrder);
 
     } catch (error) {
-      // P2003: Chave estrangeira falhou (clientId, createdById ou um itemId não existe)
       if (error.code === 'P2003') {
-        return res.status(404).json({ error: 'Não foi possível criar o pedido. Verifique se o Cliente, Criador e todos os Itens existem.', details: error.message });
+        return res.status(404).json({ error: 'Cliente, Criador ou Item não encontrado.' });
       }
-      // P2025: Um "connect" falhou (um dos itemIds não foi encontrado)
       if (error.code === 'P2025') {
-         return res.status(404).json({ error: 'Um dos IDs de item (itemId) não foi encontrado.', details: error.message });
+         return res.status(404).json({ error: 'Um dos IDs de item não foi encontrado.' });
       }
       res.status(500).json({ error: 'Erro ao criar pedido', details: error.message });
     }
   }
 
-  // --- READ (All) ---
+  // --- READ (Inteligente) ---
   async getAll(req, res) {
     try {
-      // 1. Pega o ID e o TIPO do usuário do token (injetado pelo checkAuth)
       const { id: userId, type: userType } = req.user; 
-
-      // 2. Prepara o filtro do Prisma
       const whereClause = {};
-
-      // 3. Se o usuário NÃO for ADMIN, filtra pelo ID dele
+      
+      // Se não for admin, vê apenas os próprios pedidos
       if (userType !== 'ADMIN') {
         whereClause.clientId = BigInt(userId);
       }
       
-      // 4. O findMany agora usa o filtro
       const orders = await prisma.order.findMany({
-        where: whereClause, // <-- FILTRO APLICADO
+        where: whereClause,
         include: orderInclude,
         orderBy: { createdAt: 'desc' }
       });
-      
       res.status(200).json(orders);
     } catch (error) {
       res.status(500).json({ error: 'Erro ao buscar pedidos', details: error.message });
     }
   }
 
-  // --- READ (by ID) ---
-  async getById(req, res) {
-    try {
-      const orderId = BigInt(req.params.id);
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: orderInclude
-      });
-
-      if (!order) {
-        return res.status(404).json({ error: `Pedido com ID ${orderId} não encontrado.` });
-      }
-      res.status(200).json(order);
-
-    } catch (error) {
-      res.status(500).json({ error: 'Erro ao buscar pedido', details: error.message });
-    }
-  }
-
-  // --- UPDATE (Status/Payment) ---
-  // Geralmente não se "atualiza" um pedido (adicionando/removendo itens).
-  // O mais comum é atualizar o 'status' (ex: "PENDING" -> "COMPLETED")
-  // ou o método de pagamento.
+  // --- UPDATE ---
   async update(req, res) {
     try {
       const orderId = BigInt(req.params.id);
       const { status, paymentMethod } = req.body;
-
-      // Validação
-      if (!status && !paymentMethod) {
-        return res.status(400).json({ error: 'Você deve fornecer um "status" ou "paymentMethod" para atualizar.' });
-      }
       
       const dataToUpdate = {};
       if (status) dataToUpdate.status = status;
-      if (paymentMethod) {
-        // Valida o ENUM
-        const validMethods = ['CASH', 'DEBIT', 'CREDIT', 'PIX'];
-        if (!validMethods.includes(paymentMethod)) {
-          return res.status(400).json({ error: `Método de Pagamento deve ser um de: ${validMethods.join(', ')}` });
-        }
-        dataToUpdate.paymentMethod = paymentMethod;
-      }
+      if (paymentMethod) dataToUpdate.paymentMethod = paymentMethod;
 
       const updatedOrder = await prisma.order.update({
         where: { id: orderId },
@@ -161,50 +83,36 @@ class OrderController {
         include: orderInclude
       });
       res.status(200).json(updatedOrder);
-
     } catch (error) {
-      // P2025: "Record to update not found."
-      if (error.code === 'P2025') {
-        return res.status(404).json({ error: `Pedido com ID ${req.params.id} não encontrado.` });
-      }
+      if (error.code === 'P2025') return res.status(404).json({ error: 'Pedido não encontrado.' });
       res.status(500).json({ error: 'Erro ao atualizar pedido', details: error.message });
     }
   }
 
-  // --- DELETE ---
+  // ... (getById e delete)
+  async getById(req, res) {
+    try {
+      const order = await prisma.order.findUnique({
+        where: { id: BigInt(req.params.id) },
+        include: orderInclude
+      });
+      if (!order) return res.status(404).json({ error: 'Pedido não encontrado.' });
+      res.status(200).json(order);
+    } catch (error) {
+      res.status(500).json({ error: 'Erro ao buscar pedido', details: error.message });
+    }
+  }
+
   async delete(req, res) {
     try {
       const orderId = BigInt(req.params.id);
-
-      // --- TRANSAÇÃO DE DELETE ---
-      // Como o seu schema não define "onDelete: Cascade",
-      // não podemos deletar um Order se ele tiver OrderItems.
-      // A forma correta é deletar os "filhos" (OrderItems) primeiro,
-      // e depois o "pai" (Order), tudo em uma transação.
-      
-      const transaction = await prisma.$transaction([
-        // 1. Deleta os OrderItems
-        prisma.orderItem.deleteMany({
-          where: { orderId: orderId },
-        }),
-        // 2. Deleta o Order
-        prisma.order.delete({
-          where: { id: orderId },
-        })
+      await prisma.$transaction([
+        prisma.orderItem.deleteMany({ where: { orderId: orderId } }),
+        prisma.order.delete({ where: { id: orderId } })
       ]);
-      
-      // A Posição [1] da transação é o resultado do 'prisma.order.delete'
-      // Se ele não encontrou o ID, o 'count' será 0 e lançará um erro.
-      // (O Prisma lança P2025 antes, então o catch abaixo vai pegar)
-
-      res.status(204).send(); // 204 No Content
-
+      res.status(204).send();
     } catch (error) {
-      // P2025: "Record to delete not found."
-      // (O 'prisma.order.delete' falhou pois o ID não existe)
-      if (error.code === 'P2025') {
-        return res.status(404).json({ error: `Pedido com ID ${req.params.id} não encontrado.` });
-      }
+      if (error.code === 'P2025') return res.status(404).json({ error: 'Pedido não encontrado.' });
       res.status(500).json({ error: 'Erro ao deletar pedido', details: error.message });
     }
   }

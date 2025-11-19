@@ -7,42 +7,36 @@ class AuthController {
 
   async login(req, res) {
     try {
+      // O Zod (via middleware) já garantiu que email e password existem.
       const { email, password } = req.body;
 
-      if (!email || !password) {
-        return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
-      }
-
-      // 1. Encontra o usuário pelo email
+      // 1. Verifica se o usuário existe
       const user = await prisma.user.findUnique({
         where: { email: email }
       });
 
-      // Se o email não existe
       if (!user) {
-        return res.status(404).json({ error: 'Usuário não encontrado.' });
+        return res.status(401).json({ error: 'Email ou senha incorretos.' });
       }
 
-      // 2. Compara a senha enviada com a senha (hash) no banco
+      // 2. Verifica se a senha bate
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
-      // Se a senha está incorreta
       if (!isPasswordValid) {
-        return res.status(401).json({ error: 'Senha inválida.' });
+        return res.status(401).json({ error: 'Email ou senha incorretos.' });
       }
 
-      // 3. Gera o Token JWT
-      // O token vai "carregar" o ID e o Tipo (CLIENT/ADMIN) do usuário
+      // 3. Gera o Token
       const token = jwt.sign(
         { 
           id: user.id, 
           type: user.type 
         },
-        process.env.JWT_SECRET, // Nosso segredo do .env
-        { expiresIn: '8h' } // O token expira em 8 horas
+        process.env.JWT_SECRET,
+        { expiresIn: '8h' }
       );
 
-      // Não retornamos o usuário todo, especialmente a senha!
+      // 4. Retorna Token + Usuário (Importante para o redirecionamento do Front)
       res.status(200).json({
         message: 'Login bem-sucedido!',
         token: token,
@@ -50,11 +44,13 @@ class AuthController {
           id: user.id,
           name: user.name,
           email: user.email,
-          type: user.type
+          type: user.type,
+          // Se precisar, pode retornar o endereço também se incluir no findUnique
         }
       });
 
     } catch (error) {
+      console.error(error);
       res.status(500).json({ error: 'Erro durante o login', details: error.message });
     }
   }
