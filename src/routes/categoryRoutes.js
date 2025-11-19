@@ -34,7 +34,7 @@ const router = Router();
  *             properties:
  *               description:
  *                 type: string
- *                 description: Nome da categoria (ex: Bebidas, Lanches)
+ *                 description: "Nome da categoria (ex: Bebidas, Lanches)"
  *     responses:
  *       201:
  *         description: Categoria criada com sucesso
