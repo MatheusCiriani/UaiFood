@@ -1,20 +1,17 @@
-// src/schemas/itemSchema.js
 const { z } = require('zod');
 
 const itemSchema = z.object({
   description: z.string({ required_error: "A descrição é obrigatória." })
-    .min(3, "A descrição deve ter pelo menos 3 letras."),
-  
-  // O 'coerce' é fundamental aqui!
-  // Como estamos enviando um arquivo, os dados chegam como texto ("25.50").
-  // O z.coerce.number() converte automaticamente para número (25.50).
+    .trim()
+    .min(3, "A descrição deve ter pelo menos 3 letras.")
+    .max(100, "O nome do item deve ter no máximo 100 caracteres."), // <-- Proteção visual
+
   unitPrice: z.coerce.number({ required_error: "O preço é obrigatório." })
-    .positive("O preço deve ser maior que zero."),
+    .positive("O preço deve ser positivo.")
+    .min(0.01, "O preço não pode ser zero."), // <-- Garante que não é grátis sem querer
     
-  // O categoryId também chega como string.
-  // Aceitamos string ou número e garantimos que não está vazio.
   categoryId: z.string({ required_error: "Selecione uma categoria." })
-    .or(z.number().transform(n => String(n))) // Se vier como número, transforma em string
+    .or(z.number().transform(n => String(n)))
     .refine(val => val.length > 0, "Categoria inválida"),
 });
 
