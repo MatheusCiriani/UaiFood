@@ -3,32 +3,34 @@ const { z } = require('zod');
 const addressSchema = require('./addressSchema');
 
 const createUserSchema = z.object({
-  // Regra 1: Nome sem 3 letras repetidas
-  name: z.string()
-    .min(3, "Nome deve ter no mínimo 3 letras")
-    .refine(name => !/(.)\1\1/.test(name), "O nome não pode ter 3 letras iguais seguidas") // Regex que busca 3 caracteres idênticos
-    .transform(name => name.trim()), // Remove espaços extras nas pontas
+  name: z.string({ required_error: "O nome é obrigatório." })
+    .trim()
+    .min(3, "O nome deve ter pelo menos 3 letras.")
+    // --- CORREÇÃO AQUI ---
+    // Adicionamos o 'i' no final: /(.)\1\1/i
+    // Isso faz com que 'Aaa' ou 'BBB' sejam detectados como repetidos.
+    .refine(name => !/(.)\1\1/i.test(name), "O nome não pode ter 3 letras iguais seguidas.")
+    .transform(name => name.trim()),
 
-  email: z.string()
-    .email("Email inválido")
-    .toLowerCase(), // Força email minúsculo para evitar duplicidade (Maria@ vs maria@)
+  email: z.string({ required_error: "O e-mail é obrigatório." })
+    .email("O formato do e-mail é inválido.")
+    .toLowerCase(),
 
-  // Regra 2: Telefone (DDD + Número)
-  phone: z.string()
-    .transform(val => val.replace(/\D/g, '')) // Remove parênteses, traços e espaços
-    .refine(val => val.length >= 10 && val.length <= 11, "Telefone deve ter DDD + Número (10 ou 11 dígitos)"),
+  phone: z.string({ required_error: "O telefone é obrigatório." })
+    .transform(val => val.replace(/\D/g, ''))
+    .refine(val => val.length >= 10 && val.length <= 11, "O telefone deve ter DDD + Número (10 ou 11 dígitos)."),
 
-  // Melhora 3: Senha mais forte (mínimo 6 chars + pelo menos 1 número)
-  password: z.string()
-    .min(6, "A senha deve ter no mínimo 6 caracteres")
-    .refine(val => /[0-9]/.test(val), "A senha deve conter pelo menos um número"), 
-
-  type: z.enum(['CLIENT', 'ADMIN'], { errorMap: () => ({ message: "Tipo deve ser CLIENT ou ADMIN" }) }),
+  password: z.string({ required_error: "A senha é obrigatória." })
+    .min(6, "A senha é muito curta (mínimo 6 caracteres).")
+    .refine(val => /[0-9]/.test(val), "A senha precisa ter pelo menos um número."),
   
+  type: z.enum(['CLIENT', 'ADMIN'], { 
+    errorMap: () => ({ message: "Tipo de usuário inválido (deve ser CLIENT ou ADMIN)." }) 
+  }).optional().default('CLIENT'),
+
   address: addressSchema,
 });
 
-// Update Schema (parcial)
 const updateUserSchema = createUserSchema.partial().omit({ address: true }).extend({
     addressId: z.any().optional() 
 });

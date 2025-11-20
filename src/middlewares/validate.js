@@ -1,24 +1,24 @@
 // src/middlewares/validate.js
 const validate = (schema) => (req, res, next) => {
   try {
-    // O parse valida e "limpa" os dados
+    // O Zod tenta validar e limpar os dados
     req.body = schema.parse(req.body);
     next();
   } catch (error) {
+    // O Zod lança um erro contendo uma lista de problemas (error.errors)
     
-    // --- CORREÇÃO APLICADA ---
-    // Usamos '?.' (optional chaining). 
-    // Se 'error.errors' não existir, ele tenta pegar 'error.message'.
-    // Se nem isso existir, usa uma mensagem genérica.
-    const message = error.errors?.[0]?.message || error.message || "Erro na validação dos dados";
+    // Pegamos a primeira mensagem de erro específica configurada no schema
+    // O '?.' evita que o servidor caia se o array estiver vazio por algum motivo bizarro
+    const message = error.errors?.[0]?.message || 'Erro de validação';
 
     return res.status(400).json({
+      // Enviamos essa mensagem específica no campo 'error'
+      // Assim, o seu frontend (toast) vai mostrar exatamente: "A senha deve ter no mínimo 6 caracteres"
       error: message, 
       
-      // Se for erro do Zod envia 'errors', senão envia o objeto de erro inteiro para debug
-      details: error.errors || error 
+      // Detalhes técnicos para debug (opcional)
+      details: error.errors 
     });
-    // --- FIM DA CORREÇÃO ---
   }
 };
 
